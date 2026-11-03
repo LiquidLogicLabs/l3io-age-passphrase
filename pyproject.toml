@@ -26,11 +26,11 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ravensorb/l3io-age-passphrase"
-Documentation = "https://github.com/ravensorb/l3io-age-passphrase#readme"
-Source = "https://github.com/ravensorb/l3io-age-passphrase"
-Issues = "https://github.com/ravensorb/l3io-age-passphrase/issues"
-Changelog = "https://github.com/ravensorb/l3io-age-passphrase/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/LiquidLogicLabs/l3io-age-passphrase"
+Documentation = "https://github.com/LiquidLogicLabs/l3io-age-passphrase#readme"
+Source = "https://github.com/LiquidLogicLabs/l3io-age-passphrase"
+Issues = "https://github.com/LiquidLogicLabs/l3io-age-passphrase/issues"
+Changelog = "https://github.com/LiquidLogicLabs/l3io-age-passphrase/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [

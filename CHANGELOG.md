@@ -15,4 +15,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stock `age -d` / `age -e -j batchpass` interoperability.
 - Typed stubs (`l3io_age_passphrase.pyi`) and `py.typed`.
 
-[0.1.0]: https://github.com/ravensorb/l3io-age-passphrase/releases/tag/v0.1.0
+[0.1.0]: https://github.com/LiquidLogicLabs/l3io-age-passphrase/releases/tag/v0.1.0

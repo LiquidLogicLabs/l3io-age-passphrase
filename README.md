@@ -8,7 +8,7 @@ package exists because [`pyrage`](https://github.com/woodruffw/pyrage) streams
 recipient mode but only buffers passphrase payloads
 ([pyrage#172](https://github.com/woodruffw/pyrage/issues/172)).
 
-Used by [`l3io-wordpress-database`](https://github.com/ravensorb/l3io-wordpress-database)
+Used by [`l3io-wordpress-database`](https://github.com/LiquidLogicLabs/l3io-wordpress-database)
 for multi-GB dump/archive encryption.
 
 ## Install
@@ -18,7 +18,7 @@ Wheels are published on **GitHub Releases** (not PyPI yet).
 ```shell
 # Example: Linux x86_64 manylinux abi3 wheel from the latest release
 uv pip install \
-  "https://github.com/ravensorb/l3io-age-passphrase/releases/download/v0.1.0/l3io_age_passphrase-0.1.0-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+  "https://github.com/LiquidLogicLabs/l3io-age-passphrase/releases/download/v0.1.0/l3io_age_passphrase-0.1.0-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
 ```
 
 Or pin from a release asset URL in `[tool.uv.sources]` / a Dockerfile `ADD`.
