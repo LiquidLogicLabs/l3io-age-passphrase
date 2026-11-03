@@ -1,9 +1,9 @@
-# Build multi-platform wheels, attach them to a GitHub Release, and mirror
-# them to the family Gitea PyPI index when configured.
+# Build multi-platform wheels, attach them to a GitHub Release, and optionally
+# publish to the family Gitea index, TestPyPI, or PyPI.
 #
-# PyPI itself is intentionally not configured yet — GitHub Releases + the
-# internal registry only. The mirror is gated on vars/secrets so a fork or a
-# clean clone is unaffected.
+# Tag pushes build, smoke, mirror (if configured), and create the GitHub
+# Release. TestPyPI and PyPI are dispatch-only — they burn filenames, so they
+# are never a side effect of tagging.
 
 name: Publish
 
@@ -20,6 +20,11 @@ on:
         description: Publish built wheels to the family Gitea index
         type: boolean
         default: false
+      target:
+        description: Public index to publish to (dispatch only)
+        type: choice
+        options: [none, testpypi, pypi]
+        default: none
 
 permissions: {}
 
@@ -271,6 +276,59 @@ jobs:
           # Trailing slash required by Gitea's PyPI API.
           uv publish --publish-url "${UV_PUBLISH_URL%/}/" /tmp/to-publish/*
 
+  # Token auth for now (PYPI_TEST_TOKEN). Trusted publishing can replace this
+  # once the TestPyPI project exists and a publisher is registered for this
+  # repo under the LiquidLogicLabs org.
+  publish-testpypi:
+    name: publish to TestPyPI
+    needs: [linux, macos, windows, sdist, smoke]
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/l3io-age-passphrase
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+      - name: list artifacts
+        run: ls -la dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          user: __token__
+          password: ${{ secrets.PYPI_TEST_TOKEN }}
+          packages-dir: dist/
+          skip-existing: true
+
+  publish-pypi:
+    name: publish to PyPI
+    needs: [linux, macos, windows, sdist, smoke]
+    # Explicit dispatch only — never from a tag.
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'pypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/l3io-age-passphrase
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+      - name: list artifacts
+        run: ls -la dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
+          packages-dir: dist/
+          skip-existing: true
+
   github-release:
     name: GitHub Release
     needs: [linux, macos, windows, sdist, smoke, version-gate]
@@ -309,4 +367,5 @@ jobs:
             Or grab a platform wheel from the assets below.
 
             See the [README](https://github.com/${{ github.repository }}#readme) for API docs.
-            Public PyPI publish is not enabled yet.
+
+            Public TestPyPI/PyPI uploads are dispatch-only (`target=testpypi` / `target=pypi`).
