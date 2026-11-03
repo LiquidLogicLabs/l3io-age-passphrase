@@ -41,17 +41,18 @@ jobs:
         id: check
         env:
           MIRROR_URL: ${{ vars.PYPI_CUSTOM_URL }}
-          MIRROR_USER: ${{ secrets.PYPI_CUSTOM_USERNAME }}
-          MIRROR_TOKEN: ${{ secrets.PYPI_CUSTOM_PASSWORD }}
+          # GITEA_TOKEN, not PYPI_CUSTOM_PASSWORD: that pair has been observed
+          # 401 against Gitea while GITEA_TOKEN returns 200.
+          MIRROR_TOKEN: ${{ secrets.GITEA_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -n "${MIRROR_URL}" ] && [ -n "${MIRROR_USER}" ] && [ -n "${MIRROR_TOKEN}" ]; then
+          if [ -n "${MIRROR_URL}" ] && [ -n "${MIRROR_TOKEN}" ]; then
             echo "mirror_enabled=true" >> "$GITHUB_OUTPUT"
             echo "mirror configured at ${MIRROR_URL}"
           else
             echo "mirror_enabled=false" >> "$GITHUB_OUTPUT"
             echo "mirror not configured, skipping it:" \
-                 "url:${MIRROR_URL:+set} user:${MIRROR_USER:+set} token:${MIRROR_TOKEN:+set}"
+                 "url:${MIRROR_URL:+set} token:${MIRROR_TOKEN:+set}"
           fi
 
   version-gate:
@@ -81,6 +82,11 @@ jobs:
           echo "version=${cargo_ver}" >> "$GITHUB_OUTPUT"
           echo "package version ${cargo_ver}"
 
+  # Linux targets match the official wordpress image arches we support for
+  # sidecar/CLI installs without a local Rust toolchain: amd64, arm64/v8, and
+  # arm/v7 (debian + alpine via manylinux/musllinux). Exotic wordpress arches
+  # (i386, armv5/v6, ppc64le, s390x, riscv64) are not wheeled — use the sdist
+  # or the age CLI backend there.
   linux:
     name: wheel · linux-${{ matrix.target }}
     needs: [version-gate]
@@ -88,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [x86_64, aarch64]
+        target: [x86_64, aarch64, armv7]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
@@ -228,8 +234,8 @@ jobs:
         id: missing
         env:
           MIRROR_URL: ${{ vars.PYPI_CUSTOM_URL }}
-          MIRROR_USER: ${{ secrets.PYPI_CUSTOM_USERNAME }}
-          MIRROR_TOKEN: ${{ secrets.PYPI_CUSTOM_PASSWORD }}
+          MIRROR_USER: ${{ vars.GITEA_USERNAME || github.actor }}
+          MIRROR_TOKEN: ${{ secrets.GITEA_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/to-publish
@@ -258,8 +264,8 @@ jobs:
         if: steps.missing.outputs.missing_count != '0'
         env:
           UV_PUBLISH_URL: ${{ vars.PYPI_CUSTOM_URL }}
-          UV_PUBLISH_USERNAME: ${{ secrets.PYPI_CUSTOM_USERNAME }}
-          UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_CUSTOM_PASSWORD }}
+          UV_PUBLISH_USERNAME: ${{ vars.GITEA_USERNAME || github.actor }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.GITEA_TOKEN }}
         run: |
           set -euo pipefail
           # Trailing slash required by Gitea's PyPI API.
