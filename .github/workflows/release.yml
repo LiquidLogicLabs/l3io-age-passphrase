@@ -78,6 +78,45 @@ jobs:
           git commit -m "chore: release v${NEXT}"
           git push origin HEAD:${{ github.ref_name }}
 
+      # GITHUB_TOKEN pushes do not trigger push-event workflows, so a version-bump
+      # commit would otherwise be tagged and published with no CI on that SHA
+      # (v0.1.1). Owner rule 2026-11-08: never tag while CI is red on the tip.
+      - name: CI must be green on the commit we will tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin "${{ github.ref_name }}"
+          tip=$(git rev-parse "origin/${{ github.ref_name }}")
+          echo "release tip $tip"
+          green=$(gh run list --commit "$tip" --workflow CI --json status,conclusion \
+            --jq '[.[] | select(.status == "completed" and .conclusion == "success")] | length')
+          if [ "$green" -eq 0 ]; then
+            echo "no green CI on tip yet; dispatching (GITHUB_TOKEN push events are suppressed)"
+            gh workflow run CI --ref "${{ github.ref_name }}"
+            run_id=
+            for _ in $(seq 1 90); do
+              run_id=$(gh run list --commit "$tip" --workflow CI --limit 1 \
+                --json databaseId --jq '.[0].databaseId // empty')
+              if [ -n "$run_id" ]; then break; fi
+              sleep 5
+            done
+            if [ -z "$run_id" ]; then
+              echo "::error::CI never appeared for $tip"
+              exit 1
+            fi
+            gh run watch "$run_id" --exit-status
+          else
+            echo "CI already green for tip"
+          fi
+          red=$(gh run list --commit "$tip" --json name,status,conclusion \
+            --jq '.[] | select(.status != "completed" or .conclusion != "success") | "\(.name): \(.status)/\(.conclusion)"')
+          if [ -n "$red" ]; then
+            echo "::error::CI is not green for $tip"
+            echo "$red"
+            exit 1
+          fi
+
       - name: create the tag
         uses: LiquidLogicLabs/git-action-tag-create-update@v2
         with:
@@ -85,7 +124,7 @@ jobs:
           tag-message: |
             l3io-age-passphrase v${{ steps.next.outputs.version }}
 
-            ${{ inputs.bump }} release from ${{ github.sha }}.
+            ${{ inputs.bump }} release.
           update-existing: "false"
           force: "false"
 

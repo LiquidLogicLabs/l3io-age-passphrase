@@ -1,0 +1,35 @@
+{
+  "_comment": "Which (workflow, event) pairs make ci-dryrun exercises. Reach every job so action refs resolve.",
+  "legs": [
+    {
+      "workflow": "release.yml",
+      "event": "workflow_dispatch",
+      "inputs": { "bump": "patch" }
+    },
+    {
+      "workflow": "release.yml",
+      "event": "workflow_dispatch",
+      "inputs": { "bump": "minor" }
+    },
+    {
+      "workflow": "release.yml",
+      "event": "workflow_dispatch",
+      "inputs": { "bump": "major" }
+    },
+    {
+      "workflow": "publish.yml",
+      "event": "workflow_dispatch",
+      "inputs": { "target": "none", "dry_run": "true", "mirror": "false" }
+    },
+    {
+      "workflow": "publish.yml",
+      "event": "workflow_dispatch",
+      "inputs": { "target": "testpypi", "dry_run": "false", "mirror": "false" }
+    },
+    {
+      "workflow": "publish.yml",
+      "event": "workflow_dispatch",
+      "inputs": { "target": "pypi", "dry_run": "false", "mirror": "true" }
+    }
+  ]
+}
