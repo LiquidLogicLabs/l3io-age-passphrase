@@ -20,7 +20,7 @@ Family-wide:
 ### What act can and cannot run
 
 - **act runs:** `ci.yml` linux jobs — `ruff`, `clippy`, and
-  `test · ubuntu-latest · py3.11..3.13` (full Python axis; `--matrix os:ubuntu-latest`).
+  `test · ubuntu-latest · py3.11..3.14` (full Python axis; `--matrix os:ubuntu-latest`).
 - **GitHub-only (named, not skipped silently):**
   - `test · macos-latest · …` (no macOS under act);
   - `release.yml` and `publish.yml` (tags, multi-arch wheels, registry tokens;
