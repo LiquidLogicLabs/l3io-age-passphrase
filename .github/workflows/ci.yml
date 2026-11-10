@@ -35,6 +35,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # act --concurrent-jobs caps jobs, not matrix legs (default max-parallel 4).
+      # Legs share the bind-mounted .venv under act and collide without this.
+      max-parallel: ${{ vars.LOCAL_ACT && 1 || 256 }}
       matrix:
         os: [ubuntu-latest, macos-latest]
         python: ["3.11", "3.12", "3.13", "3.14"]
