@@ -40,6 +40,8 @@ jobs:
         python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v7
+      # Explicit: GitHub-hosted images happen to ship rustup; act containers do not.
+      - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v10.1.0
         with:
           version: "0.11.6"
