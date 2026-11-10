@@ -276,9 +276,9 @@ jobs:
           # Trailing slash required by Gitea's PyPI API.
           uv publish --publish-url "${UV_PUBLISH_URL%/}/" /tmp/to-publish/*
 
-  # Token auth for now (PYPI_TEST_TOKEN). Trusted publishing can replace this
-  # once the TestPyPI project exists and a publisher is registered for this
-  # repo under the LiquidLogicLabs org.
+  # Token auth (PYPI_TEST_TOKEN): no trusted publisher is registered on
+  # test.pypi.org for this repository. Keep id-token so registering one and
+  # deleting password: switches this to OIDC with no other change.
   publish-testpypi:
     name: publish to TestPyPI
     needs: [linux, macos, windows, sdist, smoke]
@@ -287,7 +287,8 @@ jobs:
     environment:
       name: testpypi
       url: https://test.pypi.org/p/l3io-age-passphrase
-    permissions: {}
+    permissions:
+      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -308,12 +309,15 @@ jobs:
     name: publish to PyPI
     needs: [linux, macos, windows, sdist, smoke]
     # Explicit dispatch only — never from a tag.
+    # Trusted publishing (OIDC) via environment pypi — no long-lived token.
+    # Passing password: disables trusted publishing and attestations.
     if: github.event_name == 'workflow_dispatch' && inputs.target == 'pypi'
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/l3io-age-passphrase
-    permissions: {}
+    permissions:
+      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -324,8 +328,6 @@ jobs:
         run: ls -la dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_TOKEN }}
           packages-dir: dist/
           skip-existing: true
 
