@@ -741,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "l3io_age_passphrase"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "age",
  "pyo3",
