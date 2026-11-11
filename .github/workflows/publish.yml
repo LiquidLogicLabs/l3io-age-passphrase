@@ -348,7 +348,10 @@ jobs:
           merge-multiple: true
       - name: list artifacts
         run: ls -la dist/
-      - name: create or update GitHub Release
+      # softprops replaces same-named assets without comparing them. Skip when the
+      # release already exists, then verify (and fill gaps) in the next step so a
+      # re-dispatch cannot silently swap wheels for a different build.
+      - name: create the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version-gate.outputs.version }}
@@ -356,6 +359,7 @@ jobs:
           generate_release_notes: true
           files: dist/*
           fail_on_unmatched_files: true
+          skip_if_exists: true
           body: |
             Streaming age passphrase encrypt/decrypt for Python.
 
@@ -371,3 +375,52 @@ jobs:
             See the [README](https://github.com/${{ github.repository }}#readme) for API docs.
 
             Public TestPyPI/PyPI uploads are dispatch-only (`target=testpypi` / `target=pypi`).
+
+      # The release carries exactly this build. On a fresh release it catches an
+      # upload softprops dropped; on an existing one it is the only check that the
+      # assets are these artifacts (wheels are not byte-reproducible across runs).
+      #   same name, same sha256  -> nothing to do
+      #   name absent             -> uploaded WITHOUT --clobber
+      #   same name, other sha256 -> FAIL before anything is uploaded
+      - name: the release's assets are this build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: v${{ needs.version-gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          listing=$(gh release view "$TAG" --json assets --jq '.assets[] | [.name, (.digest // "")] | @tsv')
+          scratch=$(mktemp -d)
+          shopt -s nullglob
+          files=(dist/*)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::dist/ is empty; there is nothing to check the release against"
+            exit 1
+          fi
+          missing=(); bad=0
+          for f in "${files[@]}"; do
+            name=$(basename "$f")
+            want="sha256:$(sha256sum "$f" | cut -d' ' -f1)"
+            row=$(awk -F'\t' -v n="$name" '$1 == n' <<<"$listing")
+            if [ -z "$row" ]; then
+              echo "missing on the release: $name"
+              missing+=("$f")
+              continue
+            fi
+            have=$(cut -f2 <<<"$row")
+            if [ -z "$have" ]; then
+              gh release download "$TAG" --pattern "$name" --dir "$scratch"
+              have="sha256:$(sha256sum "$scratch/$name" | cut -d' ' -f1)"
+            fi
+            if [ "$have" = "$want" ]; then
+              echo "matches: $name $want"
+            else
+              echo "::error::release $TAG already has $name with $have, but this build's is $want; refusing to replace it"
+              bad=1
+            fi
+          done
+          [ "$bad" -eq 0 ] || exit 1
+          if [ "${#missing[@]}" -gt 0 ]; then
+            gh release upload "$TAG" "${missing[@]}"
+            echo "uploaded ${#missing[@]} missing asset(s)"
+          fi
