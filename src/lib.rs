@@ -15,6 +15,32 @@ use pyo3_file::PyFileLikeObject;
 create_exception!(l3io_age_passphrase, EncryptError, PyException);
 create_exception!(l3io_age_passphrase, DecryptError, PyException);
 
+/// The scrypt work factor every file is encrypted with (`N = 2^18`), stock `age -p`'s.
+///
+/// age's `Encryptor::with_user_passphrase` and `scrypt::Identity::new` instead time
+/// a small scrypt run on the wall clock: the encryption work factor and the largest
+/// one decryption accepts (that target + 4) then depend on how busy the host is,
+/// so a file encrypted while the host was idle is refused ("Excessive work
+/// parameter") while it is busy, and one encrypted while it is busy is weak.
+const WORK_FACTOR: u8 = 18;
+
+/// The largest scrypt work factor decryption accepts (`N = 2^22`, 4 GiB), fixed
+/// for the reason above. A file asking for more is refused before any work.
+const MAX_WORK_FACTOR: u8 = 22;
+
+fn encryptor(passphrase: &str) -> Encryptor {
+    let mut recipient = scrypt::Recipient::new(passphrase.into());
+    recipient.set_work_factor(WORK_FACTOR);
+    Encryptor::with_recipients(iter::once(&recipient as _))
+        .expect("a sole scrypt recipient is always a valid recipient set")
+}
+
+fn identity(passphrase: &str) -> scrypt::Identity {
+    let mut identity = scrypt::Identity::new(passphrase.into());
+    identity.set_max_work_factor(MAX_WORK_FACTOR);
+    identity
+}
+
 fn from_pyobject(file: Py<PyAny>, read_only: bool) -> PyResult<PyFileLikeObject> {
     PyFileLikeObject::with_requirements(file, read_only, !read_only, false, false)
 }
@@ -27,7 +53,7 @@ fn encrypt<'py>(
     passphrase: &str,
     armored: bool,
 ) -> PyResult<Bound<'py, PyBytes>> {
-    let encryptor = Encryptor::with_user_passphrase(passphrase.into());
+    let encryptor = encryptor(passphrase);
     let mut encrypted = vec![];
     let format = if armored {
         Format::AsciiArmor
@@ -58,7 +84,7 @@ fn decrypt<'py>(
         .map_err(|e| DecryptError::new_err(e.to_string()))?;
     let mut decrypted = vec![];
     let mut reader = decryptor
-        .decrypt(iter::once(&scrypt::Identity::new(passphrase.into()) as _))
+        .decrypt(iter::once(&identity(passphrase) as _))
         .map_err(|e| DecryptError::new_err(e.to_string()))?;
     reader
         .read_to_end(&mut decrypted)
@@ -79,7 +105,7 @@ fn encrypt_io(
     let mut reader = std::io::BufReader::new(reader);
     let mut writer = std::io::BufWriter::new(writer);
 
-    let encryptor = Encryptor::with_user_passphrase(passphrase.into());
+    let encryptor = encryptor(passphrase);
     let format = if armored {
         Format::AsciiArmor
     } else {
@@ -109,7 +135,7 @@ fn decrypt_io(reader: Py<PyAny>, writer: Py<PyAny>, passphrase: &str) -> PyResul
     let decryptor = Decryptor::new_buffered(ArmoredReader::new(reader))
         .map_err(|e| DecryptError::new_err(e.to_string()))?;
     let mut reader = decryptor
-        .decrypt(iter::once(&scrypt::Identity::new(passphrase.into()) as _))
+        .decrypt(iter::once(&identity(passphrase) as _))
         .map_err(|e| DecryptError::new_err(e.to_string()))?;
 
     std::io::copy(&mut reader, &mut writer).map_err(|e| DecryptError::new_err(e.to_string()))?;
