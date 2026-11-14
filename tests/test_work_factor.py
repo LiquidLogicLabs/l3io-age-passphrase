@@ -39,7 +39,13 @@ _STANZA = re.compile(rb"^-> scrypt \S+ (\d+)$", re.MULTILINE)
 _CHILD = r"""
 import io, resource, sys
 import l3io_age_passphrase as age_pass
-resource.setrlimit(resource.RLIMIT_AS, (2 << 30, 2 << 30))
+# Cap address space so an unfixed binder cannot spend 8 GiB on log_n 23.
+# Best-effort: macOS often rejects RLIMIT_AS here ("current limit exceeds
+# maximum limit"); the fixed max_work_factor still refuses before scrypt.
+try:
+    resource.setrlimit(resource.RLIMIT_AS, (2 << 30, 2 << 30))
+except (ValueError, OSError, AttributeError):
+    pass
 mode, path, passphrase = sys.argv[1:4]
 data = open(path, "rb").read()
 sys.stdout.write("ready\n"); sys.stdout.flush()
